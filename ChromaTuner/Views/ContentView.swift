@@ -36,6 +36,15 @@ struct ContentView: View {
                 )
                 .padding(.bottom, 12)
 
+                if audioManager.microphoneUnavailable && selectedMode == .chromatic {
+                    Text("Microphone unavailable — use a physical device to tune.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(AppColors.labelWhite.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
+
                 NoteRingPanel(mode: selectedMode)
                     .frame(maxHeight: .infinity)
 

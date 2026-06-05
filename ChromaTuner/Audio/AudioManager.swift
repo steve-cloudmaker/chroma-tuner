@@ -5,6 +5,7 @@ import Combine
 final class AudioManager: ObservableObject {
     @Published var detectedNote: NoteInfo?
     @Published var isListening = false
+    @Published var microphoneUnavailable = false
     @Published var selectedNoteIndex = 0
     @Published var selectedOctave = 4
     @Published var isTonePlaying = false
@@ -51,41 +52,66 @@ final class AudioManager: ObservableObject {
     func startListening() {
         guard !isListening else { return }
 
-        let engine = AVAudioEngine()
-        let inputNode = engine.inputNode
-        let format = inputNode.outputFormat(forBus: 0)
-        let sampleRate = format.sampleRate
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            try session.setActive(true)
 
-        pitchDetector = PitchDetector(sampleRate: sampleRate)
+            let engine = AVAudioEngine()
+            let inputNode = engine.inputNode
+            let hwFormat = inputNode.outputFormat(forBus: 0)
+            let sampleRate = resolvedSampleRate(hwFormat: hwFormat, session: session)
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
-            guard let self, let detector = self.pitchDetector else { return }
+            guard sampleRate > 0,
+                  let tapFormat = AVAudioFormat(
+                    commonFormat: .pcmFormatFloat32,
+                    sampleRate: sampleRate,
+                    channels: 1,
+                    interleaved: false
+                  )
+            else {
+                microphoneUnavailable = true
+                print("Microphone unavailable: invalid audio format (sample rate \(hwFormat.sampleRate))")
+                return
+            }
 
-            let frameCount = Int(buffer.frameLength)
-            guard let channelData = buffer.floatChannelData?[0] else { return }
-            let samples = Array(UnsafeBufferPointer(start: channelData, count: frameCount))
+            pitchDetector = PitchDetector(sampleRate: sampleRate)
+            microphoneUnavailable = false
 
-            if let frequency = detector.detectPitch(from: samples) {
-                Task { @MainActor in
-                    self.processDetectedFrequency(frequency)
+            inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak self] buffer, _ in
+                guard let self, let detector = self.pitchDetector else { return }
+
+                let frameCount = Int(buffer.frameLength)
+                guard frameCount > 0, let channelData = buffer.floatChannelData?[0] else { return }
+                let samples = Array(UnsafeBufferPointer(start: channelData, count: frameCount))
+
+                if let frequency = detector.detectPitch(from: samples) {
+                    Task { @MainActor in
+                        self.processDetectedFrequency(frequency)
+                    }
                 }
             }
-        }
 
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
-            try AVAudioSession.sharedInstance().setActive(true)
+            engine.prepare()
             try engine.start()
             audioEngine = engine
             isListening = true
         } catch {
+            microphoneUnavailable = true
             print("AudioEngine error: \(error)")
         }
     }
 
     func stopListening() {
-        audioEngine?.inputNode.removeTap(onBus: 0)
-        audioEngine?.stop()
+        guard let engine = audioEngine else {
+            isListening = false
+            detectedNote = nil
+            smoothingBuffer.removeAll()
+            return
+        }
+
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
         audioEngine = nil
         isListening = false
         detectedNote = nil
@@ -148,6 +174,12 @@ final class AudioManager: ObservableObject {
             detectedNote = MusicTheory.noteInfo(fromFrequency: freq, a4: a4Reference)
         }
         updateToneFrequency()
+    }
+
+    private func resolvedSampleRate(hwFormat: AVAudioFormat, session: AVAudioSession) -> Double {
+        if hwFormat.sampleRate > 0 { return hwFormat.sampleRate }
+        if session.sampleRate > 0 { return session.sampleRate }
+        return 44_100
     }
 
     private func processDetectedFrequency(_ frequency: Double) {
