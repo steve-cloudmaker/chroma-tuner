@@ -8,12 +8,6 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                Text("Chromatic Instrument Tuner")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(AppColors.labelWhite.opacity(0.9))
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-
                 AnalogGaugeView(
                     noteDisplay: gaugeNote,
                     frequency: audioManager.gaugeFrequency,
