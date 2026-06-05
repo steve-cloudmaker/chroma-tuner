@@ -12,3 +12,5 @@ targets:
       INFOPLIST_KEY_NSMicrophoneUsageDescription: Microphone access is required to detect pitch when tuning instruments.
       INFOPLIST_KEY_UILaunchScreen_Generation: YES
       TARGETED_DEVICE_FAMILY: "1,2"
+      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight

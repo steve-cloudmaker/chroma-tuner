@@ -1,15 +1,12 @@
-import Accelerate
 import AVFoundation
 
 final class PitchDetector {
     private let sampleRate: Double
     private let bufferSize: Int
-    private var autocorrelationBuffer: [Float]
 
     init(sampleRate: Double, bufferSize: Int = 4096) {
         self.sampleRate = sampleRate
         self.bufferSize = bufferSize
-        self.autocorrelationBuffer = [Float](repeating: 0, count: bufferSize / 2)
     }
 
     func detectPitch(from samples: [Float]) -> Double? {
