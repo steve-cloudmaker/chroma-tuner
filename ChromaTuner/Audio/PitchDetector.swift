@@ -1,5 +1,10 @@
 import AVFoundation
 
+struct PitchDetection {
+    let frequency: Double
+    let confidence: Float
+}
+
 final class PitchDetector {
     private let sampleRate: Double
     private let bufferSize: Int
@@ -9,11 +14,12 @@ final class PitchDetector {
         self.bufferSize = bufferSize
     }
 
-    func detectPitch(from samples: [Float]) -> Double? {
+    func detectPitch(from samples: [Float]) -> PitchDetection? {
         guard samples.count >= bufferSize else { return nil }
 
         let slice = Array(samples.suffix(bufferSize))
-        let windowed = applyHannWindow(slice)
+        let filtered = highPass(slice, cutoff: 80)
+        let windowed = applyHannWindow(filtered)
 
         var energy: Float = 0
         for sample in windowed {
@@ -22,14 +28,13 @@ final class PitchDetector {
         energy /= Float(windowed.count)
 
         let rms = sqrt(energy)
-        guard rms > 0.001 else { return nil }
+        guard rms > 0.004 else { return nil }
 
-        let minLag = Int(sampleRate / 2000.0)
-        let maxLag = min(Int(sampleRate / 60.0), windowed.count / 2)
+        let minLag = Int(sampleRate / 1500.0)
+        let maxLag = min(Int(sampleRate / 70.0), windowed.count / 2)
         guard maxLag > minLag else { return nil }
 
-        var bestLag = minLag
-        var bestCorrelation: Float = 0
+        var peaks: [(lag: Int, correlation: Float)] = []
 
         for lag in minLag..<maxLag {
             var correlation: Float = 0
@@ -38,16 +43,19 @@ final class PitchDetector {
                 correlation += windowed[i] * windowed[i + lag]
             }
             let normalized = correlation / (energy * Float(count))
-            if normalized > bestCorrelation {
-                bestCorrelation = normalized
-                bestLag = lag
-            }
+            peaks.append((lag, normalized))
         }
 
-        guard bestCorrelation > 0.75 else { return nil }
+        let sorted = peaks.sorted { $0.correlation > $1.correlation }
+        guard let best = sorted.first, best.correlation > 0.82 else { return nil }
+
+        if sorted.count > 1 {
+            let second = sorted[1]
+            guard best.correlation > second.correlation * 1.12 else { return nil }
+        }
 
         let refinedLag = parabolicInterpolation(
-            lag: bestLag,
+            lag: best.lag,
             windowed: windowed,
             minLag: minLag,
             maxLag: maxLag,
@@ -55,8 +63,31 @@ final class PitchDetector {
         )
 
         let frequency = sampleRate / refinedLag
-        guard frequency >= 60, frequency <= 2000 else { return nil }
-        return frequency
+        guard frequency >= 70, frequency <= 1500 else { return nil }
+
+        return PitchDetection(frequency: frequency, confidence: best.correlation)
+    }
+
+    private func highPass(_ samples: [Float], cutoff: Double) -> [Float] {
+        let rc = 1.0 / (2.0 * .pi * cutoff)
+        let dt = 1.0 / sampleRate
+        let alpha = Float(rc / (rc + dt))
+
+        var filtered = [Float](repeating: 0, count: samples.count)
+        guard let first = samples.first else { return filtered }
+
+        var previousInput = first
+        var previousOutput: Float = 0
+
+        for index in 0..<samples.count {
+            let input = samples[index]
+            let output = alpha * (previousOutput + input - previousInput)
+            filtered[index] = output
+            previousInput = input
+            previousOutput = output
+        }
+
+        return filtered
     }
 
     private func applyHannWindow(_ samples: [Float]) -> [Float] {

@@ -14,9 +14,10 @@ final class AudioManager: ObservableObject {
 
     private var audioEngine: AVAudioEngine?
     private var pitchDetector: PitchDetector?
+    private let pitchStabilizer = PitchStabilizer()
     private let tonePlayer = TonePlayer()
     private var smoothingBuffer: [Double] = []
-    private let smoothingWindow = 5
+    private let smoothingWindow = 8
     private var routeChangeObserver: NSObjectProtocol?
 
     var selectedNoteName: String {
@@ -108,6 +109,7 @@ final class AudioManager: ObservableObject {
             }
 
             pitchDetector = PitchDetector(sampleRate: sampleRate)
+            pitchStabilizer.reset()
             microphoneUnavailable = false
 
             // Input must be connected for the graph to pull mic data on device
@@ -120,12 +122,18 @@ final class AudioManager: ObservableObject {
                 guard !samples.isEmpty else { return }
 
                 let level = Self.level(from: samples)
+                let detection = detector.detectPitch(from: samples)
+
                 Task { @MainActor in
                     self.updateInputLevel(level)
-                }
+                    let result = self.pitchStabilizer.process(
+                        frequency: detection?.frequency,
+                        inputLevel: self.inputLevel
+                    )
 
-                if let frequency = detector.detectPitch(from: samples) {
-                    Task { @MainActor in
+                    if result.shouldClearDisplay {
+                        self.clearDetectedPitch()
+                    } else if let frequency = result.frequency {
                         self.processDetectedFrequency(frequency)
                     }
                 }
@@ -144,9 +152,9 @@ final class AudioManager: ObservableObject {
     func stopListening() {
         guard let engine = audioEngine else {
             isListening = false
-            detectedNote = nil
+            clearDetectedPitch()
             inputLevel = 0
-            smoothingBuffer.removeAll()
+            pitchStabilizer.reset()
             return
         }
 
@@ -154,9 +162,9 @@ final class AudioManager: ObservableObject {
         engine.stop()
         audioEngine = nil
         isListening = false
-        detectedNote = nil
+        clearDetectedPitch()
         inputLevel = 0
-        smoothingBuffer.removeAll()
+        pitchStabilizer.reset()
     }
 
     func restartListening() {
@@ -268,14 +276,20 @@ final class AudioManager: ObservableObject {
         inputLevel = inputLevel * 0.55 + instant * 0.45
     }
 
+    private func clearDetectedPitch() {
+        detectedNote = nil
+        smoothingBuffer.removeAll()
+    }
+
     private func processDetectedFrequency(_ frequency: Double) {
         smoothingBuffer.append(frequency)
         if smoothingBuffer.count > smoothingWindow {
             smoothingBuffer.removeFirst()
         }
 
-        let averaged = smoothingBuffer.reduce(0, +) / Double(smoothingBuffer.count)
-        detectedNote = MusicTheory.noteInfo(fromFrequency: averaged, a4: a4Reference)
+        let sorted = smoothingBuffer.sorted()
+        let median = sorted[sorted.count / 2]
+        detectedNote = MusicTheory.noteInfo(fromFrequency: median, a4: a4Reference)
     }
 
     private static func mixedSamples(from buffer: AVAudioPCMBuffer) -> [Float] {
