@@ -6,6 +6,7 @@ struct NoteRingPanel: View {
 
     @State private var dragRotation: Double = 0
     @State private var lastDragRotation: Double = 0
+    @State private var isDragging = false
 
     private var tunerRotation: Double {
         guard let note = audioManager.detectedNote else { return 0 }
@@ -22,28 +23,36 @@ struct NoteRingPanel: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            ZStack {
-                NoteDialView(
-                    accentColor: mode == .chromatic ? AppColors.gaugeAmberDark : AppColors.accentBlue,
-                    highlightedNoteIndex: mode == .chromatic ? tunerHighlightIndex : audioManager.selectedNoteIndex,
-                    rotationOffset: ringRotation
-                )
-                .animation(.easeOut(duration: 0.08), value: ringRotation)
-                .gesture(mode == .toneGenerator ? rotationGesture : nil)
+            GeometryReader { geo in
+                let size = min(geo.size.width, geo.size.height)
+                let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
 
-                if mode == .toneGenerator {
-                    CenterToneButton(
-                        noteDisplay: audioManager.selectedNoteDisplay,
-                        isPlaying: audioManager.isTonePlaying
-                    ) {
-                        audioManager.toggleTone()
+                ZStack {
+                    NoteDialView(
+                        accentColor: mode == .chromatic ? AppColors.gaugeAmberDark : AppColors.accentBlue,
+                        highlightedNoteIndex: mode == .chromatic ? tunerHighlightIndex : audioManager.selectedNoteIndex,
+                        rotationOffset: ringRotation
+                    )
+                    .animation(isDragging ? nil : .easeOut(duration: 0.08), value: ringRotation)
+
+                    if mode == .toneGenerator {
+                        CenterToneButton(
+                            noteDisplay: audioManager.selectedNoteDisplay,
+                            isPlaying: audioManager.isTonePlaying
+                        ) {
+                            audioManager.toggleTone()
+                        }
+                        .frame(width: size * 0.32, height: size * 0.32)
+                    } else if let note = audioManager.detectedNote {
+                        TunerCenterDisplay(noteDisplay: note.displayName)
+                            .frame(width: size * 0.32, height: size * 0.32)
                     }
-                    .frame(width: 90, height: 90)
-                } else if let note = audioManager.detectedNote {
-                    TunerCenterDisplay(noteDisplay: note.displayName)
-                        .frame(width: 90, height: 90)
                 }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .contentShape(Circle())
+                .gesture(mode == .toneGenerator ? rotationGesture(center: center) : nil)
             }
+            .aspectRatio(1, contentMode: .fit)
             .padding(.horizontal, 24)
 
             if mode == .toneGenerator {
@@ -55,8 +64,10 @@ struct NoteRingPanel: View {
             }
         }
         .onAppear { syncDragRotation() }
-        .onChange(of: audioManager.selectedNoteIndex) { _, _ in
-            if mode == .toneGenerator { syncDragRotation() }
+        .onChange(of: mode) { _, newMode in
+            if newMode == .toneGenerator {
+                syncDragRotation()
+            }
         }
     }
 
@@ -66,31 +77,46 @@ struct NoteRingPanel: View {
         lastDragRotation = snapped
     }
 
-    private var rotationGesture: some Gesture {
-        DragGesture()
+    private func rotationGesture(center: CGPoint) -> some Gesture {
+        DragGesture(minimumDistance: 4)
             .onChanged { value in
-                let size: CGFloat = 280
-                let center = CGPoint(x: size / 2, y: size / 2)
-                let current = angle(from: center, to: value.location)
+                isDragging = true
                 let start = angle(from: center, to: value.startLocation)
-                dragRotation = lastDragRotation + (current - start)
+                let current = angle(from: center, to: value.location)
+                let delta = shortestAngleDelta(from: start, to: current)
+                dragRotation = lastDragRotation + delta
 
-                let normalized = ((-dragRotation).truncatingRemainder(dividingBy: 360) + 360)
-                    .truncatingRemainder(dividingBy: 360)
-                let noteIndex = Int(round(normalized / 30.0)) % 12
-                audioManager.selectNote(at: noteIndex)
+                let noteIndex = noteIndex(for: dragRotation)
+                if noteIndex != audioManager.selectedNoteIndex {
+                    audioManager.selectNote(at: noteIndex)
+                }
             }
             .onEnded { _ in
                 let snapped = round(dragRotation / 30.0) * 30.0
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    dragRotation = snapped
-                }
+                dragRotation = snapped
                 lastDragRotation = snapped
+                isDragging = false
+
+                let noteIndex = noteIndex(for: snapped)
+                audioManager.selectNote(at: noteIndex)
             }
+    }
+
+    private func noteIndex(for rotation: Double) -> Int {
+        let normalized = ((-rotation).truncatingRemainder(dividingBy: 360) + 360)
+            .truncatingRemainder(dividingBy: 360)
+        return Int(round(normalized / 30.0)) % 12
     }
 
     private func angle(from center: CGPoint, to point: CGPoint) -> Double {
         atan2(point.y - center.y, point.x - center.x) * 180 / .pi
+    }
+
+    private func shortestAngleDelta(from start: Double, to end: Double) -> Double {
+        var delta = end - start
+        while delta > 180 { delta -= 360 }
+        while delta < -180 { delta += 360 }
+        return delta
     }
 }
 

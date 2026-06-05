@@ -39,24 +39,15 @@ struct NoteDialView: View {
                 ZStack {
                     ForEach(0..<tickCount, id: \.self) { tick in
                         let isMajor = tick % 5 == 0
-                        let angle = Double(tick) * 6.0 - 90.0 + rotationOffset
-                        let tickRadius = radius * 0.88
-
                         Rectangle()
                             .fill(AppColors.labelMuted.opacity(isMajor ? 0.7 : 0.35))
                             .frame(width: isMajor ? 2 : 1, height: isMajor ? 10 : 5)
-                            .position(
-                                x: radius + cos(angle * .pi / 180) * tickRadius,
-                                y: radius + sin(angle * .pi / 180) * tickRadius
-                            )
-                            .rotationEffect(.degrees(angle + 90))
+                            .offset(y: -radius * 0.84)
+                            .rotationEffect(.degrees(Double(tick) * 6.0))
                     }
 
                     ForEach(0..<12, id: \.self) { index in
-                        let angle = MusicTheory.noteAngle(forNoteIndex: index) + rotationOffset
                         let isHighlighted = highlightedNoteIndex == index
-                        let labelRadius = radius * 0.72
-                        let radians = angle * .pi / 180
 
                         Text(noteNames[index])
                             .font(.system(size: isHighlighted ? 15 : 13, weight: isHighlighted ? .bold : .regular))
@@ -69,12 +60,11 @@ struct NoteDialView: View {
                                         .fill(accentColor)
                                 }
                             }
-                            .position(
-                                x: radius + cos(radians) * labelRadius,
-                                y: radius + sin(radians) * labelRadius
-                            )
+                            .offset(y: -radius * 0.68)
+                            .rotationEffect(.degrees(Double(index) * 30.0))
                     }
                 }
+                .rotationEffect(.degrees(rotationOffset))
 
                 SelectionWedge(color: accentColor)
                     .frame(width: 44, height: 20)
