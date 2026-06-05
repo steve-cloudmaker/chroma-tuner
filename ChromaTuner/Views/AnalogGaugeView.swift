@@ -82,11 +82,6 @@ private struct CentScaleView: View {
             let arcY = h * 0.35
 
             ZStack {
-                CentArc()
-                    .stroke(AppColors.gaugeText.opacity(0.6), lineWidth: 1)
-                    .frame(width: w * 0.9, height: h * 0.7)
-                    .position(x: w / 2, y: arcY)
-
                 ForEach(-50...50, id: \.self) { cent in
                     if cent % 10 == 0 {
                         let x = centToX(cent, width: w)
@@ -146,20 +141,6 @@ private struct CentScaleView: View {
     private func centPosition(_ cent: Double, width: CGFloat) -> CGFloat {
         let normalized = (CGFloat(cent) + 50) / 100.0
         return width * 0.05 + normalized * width * 0.9
-    }
-}
-
-private struct CentArc: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.addArc(
-            center: CGPoint(x: rect.midX, y: rect.maxY),
-            radius: rect.width / 2,
-            startAngle: .degrees(200),
-            endAngle: .degrees(340),
-            clockwise: false
-        )
-        return path
     }
 }
 
