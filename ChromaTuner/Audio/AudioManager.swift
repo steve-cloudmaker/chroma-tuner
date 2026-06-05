@@ -11,6 +11,10 @@ final class AudioManager: ObservableObject {
     @Published var isTonePlaying = false
     @Published var a4Reference: Double = MusicTheory.defaultA4
     @Published var inputLevel: Float = 0
+    @Published var noiseGateLevel: Float
+
+    private static let defaultNoiseGateLevel: Float = 0.05
+    private static let noiseGateLevelKey = "noiseGateLevel"
 
     private var audioEngine: AVAudioEngine?
     private var pitchDetector: PitchDetector?
@@ -45,6 +49,10 @@ final class AudioManager: ObservableObject {
     }
 
     init() {
+        let savedGate = UserDefaults.standard.float(forKey: Self.noiseGateLevelKey)
+        noiseGateLevel = savedGate > 0 ? savedGate : Self.defaultNoiseGateLevel
+        pitchStabilizer.noiseGateLevel = noiseGateLevel
+
         routeChangeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
@@ -234,6 +242,17 @@ final class AudioManager: ObservableObject {
 
     func resetA4() {
         setA4Reference(MusicTheory.defaultA4)
+    }
+
+    func setNoiseGateLevel(_ level: Float) {
+        let clamped = max(0.01, min(0.5, level))
+        noiseGateLevel = clamped
+        pitchStabilizer.noiseGateLevel = clamped
+        UserDefaults.standard.set(clamped, forKey: Self.noiseGateLevelKey)
+    }
+
+    func resetNoiseGateLevel() {
+        setNoiseGateLevel(Self.defaultNoiseGateLevel)
     }
 
     private func refreshPitchFromCalibration() {

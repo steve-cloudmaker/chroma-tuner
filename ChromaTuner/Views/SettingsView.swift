@@ -51,13 +51,40 @@ struct SettingsView: View {
                     Text("Set the reference frequency for A4. Common values are 440 Hz (modern) and 442 Hz (orchestral).")
                 }
 
-                Section("Tuning") {
+                Section {
                     HStack {
                         Text("In-Tune Threshold")
                         Spacer()
                         Text("±\(Int(MusicTheory.inTuneThreshold)) cents")
                             .foregroundStyle(.secondary)
                     }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Noise Gate")
+                            Spacer()
+                            Text("\(Int(audioManager.noiseGateLevel * 100))%")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(audioManager.noiseGateLevel) },
+                                set: { audioManager.setNoiseGateLevel(Float($0)) }
+                            ),
+                            in: 0.01...0.50,
+                            step: 0.01
+                        )
+                    }
+
+                    Button("Reset to 5%") {
+                        audioManager.resetNoiseGateLevel()
+                    }
+                } header: {
+                    Text("Tuning")
+                } footer: {
+                    Text("Noise gate sets the minimum input level before the tuner locks onto a pitch. Lower values are more sensitive.")
                 }
 
                 Section("About") {

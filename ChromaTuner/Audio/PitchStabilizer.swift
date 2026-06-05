@@ -11,7 +11,7 @@ final class PitchStabilizer {
     private var silenceFrames = 0
     private var lastStableFrequency: Double?
 
-    private let noiseGateLevel: Float = 0.2
+    var noiseGateLevel: Float = 0.05
     private let requiredStableFrames = 5
     private let silenceFramesToClear = 12
     private let maxFrequencyJumpCents = 80.0
