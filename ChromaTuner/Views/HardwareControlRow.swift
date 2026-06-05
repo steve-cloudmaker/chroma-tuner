@@ -33,16 +33,22 @@ private struct ModeButton: View {
     let activeColor: Color
     let action: () -> Void
 
+    private let buttonSize: CGFloat = 72
+
     var body: some View {
         Button(action: action) {
             ZStack {
-                WingButtonShape()
+                Circle()
                     .fill(
                         LinearGradient(
                             colors: [AppColors.silverHighlight, AppColors.silver, AppColors.silverShadow],
-                            startPoint: .top,
-                            endPoint: .bottom
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(AppColors.silverShadow.opacity(0.6), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.4), radius: 3, y: 2)
 
@@ -51,25 +57,8 @@ private struct ModeButton: View {
                     .foregroundStyle(isActive ? activeColor : AppColors.housingDark)
                     .shadow(color: isActive ? activeColor.opacity(0.6) : .clear, radius: 8)
             }
-            .frame(width: 100, height: 70)
+            .frame(width: buttonSize, height: buttonSize)
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct WingButtonShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let curve = rect.height * 0.25
-
-        path.move(to: CGPoint(x: rect.minX + 8, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - 8, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.midY),
-            control: CGPoint(x: rect.midX, y: rect.maxY + curve)
-        )
-        path.closeSubpath()
-        return path
     }
 }
