@@ -7,17 +7,18 @@ final class TonePlayer {
     private var phase: Double = 0.0
     private(set) var isPlaying = false
 
-    func play(frequency: Double) {
+    func play(frequency: Double, sampleRate: Double = 44_100) -> Bool {
         stop()
         currentFrequency = frequency
 
         let engine = AVAudioEngine()
-        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
+            return false
+        }
 
         let sourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
             guard let self else { return noErr }
             let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
-            let sampleRate = 44100.0
             let angularFrequency = 2.0 * .pi * self.currentFrequency / sampleRate
 
             for frame in 0..<Int(frameCount) {
@@ -37,14 +38,15 @@ final class TonePlayer {
         engine.connect(sourceNode, to: engine.mainMixerNode, format: format)
 
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
+            engine.prepare()
             try engine.start()
             self.engine = engine
             self.sourceNode = sourceNode
             isPlaying = true
+            return true
         } catch {
-            print("TonePlayer error: \(error)")
+            print("TonePlayer engine error: \(error)")
+            return false
         }
     }
 

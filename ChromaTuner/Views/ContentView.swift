@@ -77,11 +77,14 @@ struct ContentView: View {
             audioManager.stopTone()
         }
         .onChange(of: selectedMode) { _, newMode in
-            if newMode == .chromatic {
+            switch newMode {
+            case .chromatic:
                 audioManager.stopTone()
                 if !audioManager.isListening {
                     audioManager.startListening()
                 }
+            case .toneGenerator:
+                audioManager.stopListening()
             }
         }
     }

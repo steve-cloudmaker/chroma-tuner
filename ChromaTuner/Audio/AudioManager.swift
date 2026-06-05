@@ -51,11 +51,11 @@ final class AudioManager: ObservableObject {
 
     func startListening() {
         guard !isListening else { return }
+        stopTone()
 
         do {
+            try configureSessionForRecording()
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
-            try session.setActive(true)
 
             let engine = AVAudioEngine()
             let inputNode = engine.inputNode
@@ -127,8 +127,20 @@ final class AudioManager: ObservableObject {
     }
 
     func startTone() {
-        tonePlayer.play(frequency: selectedFrequency)
-        isTonePlaying = true
+        stopListening()
+
+        do {
+            let session = try configureSessionForPlayback()
+            let sampleRate = session.sampleRate > 0 ? session.sampleRate : 44_100
+            let started = tonePlayer.play(frequency: selectedFrequency, sampleRate: sampleRate)
+            isTonePlaying = started
+            if !started {
+                print("TonePlayer failed to start")
+            }
+        } catch {
+            isTonePlaying = false
+            print("TonePlayer session error: \(error)")
+        }
     }
 
     func stopTone() {
@@ -174,6 +186,30 @@ final class AudioManager: ObservableObject {
             detectedNote = MusicTheory.noteInfo(fromFrequency: freq, a4: a4Reference)
         }
         updateToneFrequency()
+    }
+
+    private func configureSessionForRecording() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try activateSession(session)
+    }
+
+    @discardableResult
+    private func configureSessionForPlayback() throws -> AVAudioSession {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try activateSession(session)
+        return session
+    }
+
+    private func activateSession(_ session: AVAudioSession) throws {
+        do {
+            try session.setActive(true)
+        } catch let error as NSError where error.code == 561017449 {
+            // AVAudioSessionErrorInsufficientPriority — retry after releasing prior engine
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
+            try session.setActive(true)
+        }
     }
 
     private func resolvedSampleRate(hwFormat: AVAudioFormat, session: AVAudioSession) -> Double {
