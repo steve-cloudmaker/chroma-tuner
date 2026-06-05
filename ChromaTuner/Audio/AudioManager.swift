@@ -16,6 +16,7 @@ final class AudioManager: ObservableObject {
     private let tonePlayer = TonePlayer()
     private var smoothingBuffer: [Double] = []
     private let smoothingWindow = 5
+    private var routeChangeObserver: NSObjectProtocol?
 
     var selectedNoteName: String {
         MusicTheory.noteNames[selectedNoteIndex]
@@ -41,6 +42,25 @@ final class AudioManager: ObservableObject {
         detectedNote?.cents ?? 0
     }
 
+    init() {
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isListening else { return }
+                self.restartListening()
+            }
+        }
+    }
+
+    deinit {
+        if let routeChangeObserver {
+            NotificationCenter.default.removeObserver(routeChangeObserver)
+        }
+    }
+
     func requestMicrophonePermission() async -> Bool {
         await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { granted in
@@ -56,34 +76,47 @@ final class AudioManager: ObservableObject {
         do {
             try configureSessionForRecording()
             let session = AVAudioSession.sharedInstance()
+            try session.setPreferredSampleRate(44_100)
+            try session.setPreferredIOBufferDuration(0.005)
 
             let engine = AVAudioEngine()
             let inputNode = engine.inputNode
+            let mixerNode = engine.mainMixerNode
             let hwFormat = inputNode.outputFormat(forBus: 0)
             let sampleRate = resolvedSampleRate(hwFormat: hwFormat, session: session)
 
-            guard sampleRate > 0,
-                  let tapFormat = AVAudioFormat(
-                    commonFormat: .pcmFormatFloat32,
-                    sampleRate: sampleRate,
-                    channels: 1,
-                    interleaved: false
-                  )
-            else {
+            guard sampleRate > 0 else {
                 microphoneUnavailable = true
-                print("Microphone unavailable: invalid audio format (sample rate \(hwFormat.sampleRate))")
+                print("Microphone unavailable: invalid sample rate \(hwFormat.sampleRate)")
+                return
+            }
+
+            let tapFormat: AVAudioFormat
+            if hwFormat.sampleRate > 0 && hwFormat.channelCount > 0 {
+                tapFormat = hwFormat
+            } else if let fallback = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: sampleRate,
+                channels: 1,
+                interleaved: false
+            ) {
+                tapFormat = fallback
+            } else {
+                microphoneUnavailable = true
                 return
             }
 
             pitchDetector = PitchDetector(sampleRate: sampleRate)
             microphoneUnavailable = false
 
+            // Input must be connected for the graph to pull mic data on device
+            engine.connect(inputNode, to: mixerNode, format: tapFormat)
+            mixerNode.outputVolume = 0
+
             inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak self] buffer, _ in
                 guard let self, let detector = self.pitchDetector else { return }
-
-                let frameCount = Int(buffer.frameLength)
-                guard frameCount > 0, let channelData = buffer.floatChannelData?[0] else { return }
-                let samples = Array(UnsafeBufferPointer(start: channelData, count: frameCount))
+                let samples = Self.mixedSamples(from: buffer)
+                guard !samples.isEmpty else { return }
 
                 if let frequency = detector.detectPitch(from: samples) {
                     Task { @MainActor in
@@ -116,6 +149,12 @@ final class AudioManager: ObservableObject {
         isListening = false
         detectedNote = nil
         smoothingBuffer.removeAll()
+    }
+
+    func restartListening() {
+        guard isListening else { return }
+        stopListening()
+        startListening()
     }
 
     func toggleTone() {
@@ -172,16 +211,16 @@ final class AudioManager: ObservableObject {
         updateToneFrequency()
     }
 
-    func adjustA4(by amount: Double) {
-        a4Reference = max(400, min(480, (a4Reference + amount).rounded(toPlaces: amount < 1 ? 1 : 0)))
-        if let freq = detectedNote?.frequency {
-            detectedNote = MusicTheory.noteInfo(fromFrequency: freq, a4: a4Reference)
-        }
-        updateToneFrequency()
+    func setA4Reference(_ frequency: Double) {
+        a4Reference = max(400, min(480, frequency.rounded(toPlaces: 1)))
+        refreshPitchFromCalibration()
     }
 
     func resetA4() {
-        a4Reference = MusicTheory.defaultA4
+        setA4Reference(MusicTheory.defaultA4)
+    }
+
+    private func refreshPitchFromCalibration() {
         if let freq = detectedNote?.frequency {
             detectedNote = MusicTheory.noteInfo(fromFrequency: freq, a4: a4Reference)
         }
@@ -190,7 +229,7 @@ final class AudioManager: ObservableObject {
 
     private func configureSessionForRecording() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try activateSession(session)
     }
 
@@ -206,7 +245,6 @@ final class AudioManager: ObservableObject {
         do {
             try session.setActive(true)
         } catch let error as NSError where error.code == 561017449 {
-            // AVAudioSessionErrorInsufficientPriority — retry after releasing prior engine
             try session.setActive(false, options: .notifyOthersOnDeactivation)
             try session.setActive(true)
         }
@@ -226,6 +264,30 @@ final class AudioManager: ObservableObject {
 
         let averaged = smoothingBuffer.reduce(0, +) / Double(smoothingBuffer.count)
         detectedNote = MusicTheory.noteInfo(fromFrequency: averaged, a4: a4Reference)
+    }
+
+    private static func mixedSamples(from buffer: AVAudioPCMBuffer) -> [Float] {
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0, let channelData = buffer.floatChannelData else { return [] }
+
+        let channelCount = Int(buffer.format.channelCount)
+        var samples = [Float](repeating: 0, count: frameCount)
+
+        for channel in 0..<channelCount {
+            let data = channelData[channel]
+            for frame in 0..<frameCount {
+                samples[frame] += data[frame]
+            }
+        }
+
+        if channelCount > 1 {
+            let scale = 1.0 / Float(channelCount)
+            for frame in 0..<frameCount {
+                samples[frame] *= scale
+            }
+        }
+
+        return samples
     }
 }
 

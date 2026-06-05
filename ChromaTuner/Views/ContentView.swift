@@ -27,13 +27,7 @@ struct ContentView: View {
                 )
                 .padding(.vertical, 8)
 
-                HardwareControlRow(
-                    selectedMode: $selectedMode,
-                    onDecreaseA4: { audioManager.adjustA4(by: -1) },
-                    onIncreaseA4: { audioManager.adjustA4(by: 1) },
-                    onDecreaseA4Fine: { audioManager.adjustA4(by: -0.1) },
-                    onIncreaseA4Fine: { audioManager.adjustA4(by: 0.1) }
-                )
+                HardwareControlRow(selectedMode: $selectedMode)
                 .padding(.bottom, 12)
 
                 if audioManager.microphoneUnavailable && selectedMode == .chromatic {
@@ -68,8 +62,10 @@ struct ContentView: View {
         }
         .task {
             let granted = await audioManager.requestMicrophonePermission()
-            if granted {
+            if granted, selectedMode == .chromatic {
                 audioManager.startListening()
+            } else if !granted {
+                audioManager.microphoneUnavailable = true
             }
         }
         .onDisappear {

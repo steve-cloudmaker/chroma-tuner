@@ -4,7 +4,7 @@ final class PitchDetector {
     private let sampleRate: Double
     private let bufferSize: Int
 
-    init(sampleRate: Double, bufferSize: Int = 4096) {
+    init(sampleRate: Double, bufferSize: Int = 2048) {
         self.sampleRate = sampleRate
         self.bufferSize = bufferSize
     }
@@ -12,9 +12,17 @@ final class PitchDetector {
     func detectPitch(from samples: [Float]) -> Double? {
         guard samples.count >= bufferSize else { return nil }
 
-        let windowed = applyHannWindow(samples)
-        let rms = sqrt(windowed.map { $0 * $0 }.reduce(0, +) / Float(windowed.count))
-        guard rms > 0.01 else { return nil }
+        let slice = Array(samples.suffix(bufferSize))
+        let windowed = applyHannWindow(slice)
+
+        var energy: Float = 0
+        for sample in windowed {
+            energy += sample * sample
+        }
+        energy /= Float(windowed.count)
+
+        let rms = sqrt(energy)
+        guard rms > 0.001 else { return nil }
 
         let minLag = Int(sampleRate / 2000.0)
         let maxLag = min(Int(sampleRate / 60.0), windowed.count / 2)
@@ -29,19 +37,21 @@ final class PitchDetector {
             for i in 0..<count {
                 correlation += windowed[i] * windowed[i + lag]
             }
-            if correlation > bestCorrelation {
-                bestCorrelation = correlation
+            let normalized = correlation / (energy * Float(count))
+            if normalized > bestCorrelation {
+                bestCorrelation = normalized
                 bestLag = lag
             }
         }
 
-        guard bestCorrelation > 0.5 else { return nil }
+        guard bestCorrelation > 0.75 else { return nil }
 
         let refinedLag = parabolicInterpolation(
             lag: bestLag,
-            correlations: windowed,
+            windowed: windowed,
             minLag: minLag,
-            maxLag: maxLag
+            maxLag: maxLag,
+            energy: energy
         )
 
         let frequency = sampleRate / refinedLag
@@ -50,7 +60,8 @@ final class PitchDetector {
     }
 
     private func applyHannWindow(_ samples: [Float]) -> [Float] {
-        let count = min(samples.count, bufferSize)
+        let count = samples.count
+        guard count > 1 else { return samples }
         var windowed = [Float](repeating: 0, count: count)
         for i in 0..<count {
             let window = 0.5 * (1.0 - cos(2.0 * .pi * Double(i) / Double(count - 1)))
@@ -59,21 +70,27 @@ final class PitchDetector {
         return windowed
     }
 
-    private func parabolicInterpolation(lag: Int, correlations: [Float], minLag: Int, maxLag: Int) -> Double {
+    private func parabolicInterpolation(
+        lag: Int,
+        windowed: [Float],
+        minLag: Int,
+        maxLag: Int,
+        energy: Float
+    ) -> Double {
         guard lag > minLag, lag < maxLag - 1 else { return Double(lag) }
 
-        func correlation(at lag: Int) -> Float {
-            var sum: Float = 0
-            let count = correlations.count - lag
+        func normalizedCorrelation(at lag: Int) -> Float {
+            var correlation: Float = 0
+            let count = windowed.count - lag
             for i in 0..<count {
-                sum += correlations[i] * correlations[i + lag]
+                correlation += windowed[i] * windowed[i + lag]
             }
-            return sum
+            return correlation / (energy * Float(count))
         }
 
-        let y0 = correlation(at: lag - 1)
-        let y1 = correlation(at: lag)
-        let y2 = correlation(at: lag + 1)
+        let y0 = normalizedCorrelation(at: lag - 1)
+        let y1 = normalizedCorrelation(at: lag)
+        let y2 = normalizedCorrelation(at: lag + 1)
 
         let denominator = 2.0 * Double(2.0 * y1 - y0 - y2)
         guard abs(denominator) > 1e-6 else { return Double(lag) }
