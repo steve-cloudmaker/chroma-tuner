@@ -19,6 +19,8 @@ enum AppColors {
     static let ledGreenGlow = Color(red: 0.40, green: 1.0, blue: 0.45)
     static let ledOff = Color(red: 0.15, green: 0.12, blue: 0.12)
 
+    static let tunerYellow = Color(red: 0.96, green: 0.77, blue: 0.06)
+
     static let ringFace = Color(red: 0.88, green: 0.89, blue: 0.91)
     static let ringInset = Color(red: 0.55, green: 0.56, blue: 0.58)
     static let accentBlue = Color(red: 0.25, green: 0.50, blue: 0.82)

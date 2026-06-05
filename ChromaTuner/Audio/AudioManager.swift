@@ -10,6 +10,7 @@ final class AudioManager: ObservableObject {
     @Published var selectedOctave = 4
     @Published var isTonePlaying = false
     @Published var a4Reference: Double = MusicTheory.defaultA4
+    @Published var inputLevel: Float = 0
 
     private var audioEngine: AVAudioEngine?
     private var pitchDetector: PitchDetector?
@@ -118,6 +119,11 @@ final class AudioManager: ObservableObject {
                 let samples = Self.mixedSamples(from: buffer)
                 guard !samples.isEmpty else { return }
 
+                let level = Self.level(from: samples)
+                Task { @MainActor in
+                    self.updateInputLevel(level)
+                }
+
                 if let frequency = detector.detectPitch(from: samples) {
                     Task { @MainActor in
                         self.processDetectedFrequency(frequency)
@@ -139,6 +145,7 @@ final class AudioManager: ObservableObject {
         guard let engine = audioEngine else {
             isListening = false
             detectedNote = nil
+            inputLevel = 0
             smoothingBuffer.removeAll()
             return
         }
@@ -148,6 +155,7 @@ final class AudioManager: ObservableObject {
         audioEngine = nil
         isListening = false
         detectedNote = nil
+        inputLevel = 0
         smoothingBuffer.removeAll()
     }
 
@@ -256,6 +264,10 @@ final class AudioManager: ObservableObject {
         return 44_100
     }
 
+    private func updateInputLevel(_ instant: Float) {
+        inputLevel = inputLevel * 0.55 + instant * 0.45
+    }
+
     private func processDetectedFrequency(_ frequency: Double) {
         smoothingBuffer.append(frequency)
         if smoothingBuffer.count > smoothingWindow {
@@ -288,6 +300,18 @@ final class AudioManager: ObservableObject {
         }
 
         return samples
+    }
+
+    private static func level(from samples: [Float]) -> Float {
+        var peak: Float = 0
+        for sample in samples {
+            peak = max(peak, abs(sample))
+        }
+        guard peak > 0 else { return 0 }
+
+        let db = 20 * log10(peak)
+        let normalized = (db + 50) / 50
+        return min(1, max(0, normalized))
     }
 }
 

@@ -18,6 +18,7 @@
 		4BBA2E12BA2FA49AF7B9D816 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5A5A28C45DB7748A569120 /* SettingsView.swift */; };
 		52BD664A9164DBD77AB42D1A /* HardwareControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1E77B5577D8CA1BC144117 /* HardwareControlRow.swift */; };
 		75399F8B5BDFB4D89EA2CAA1 /* PitchDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A183453C30C2DDB758F2A3 /* PitchDetector.swift */; };
+		8F17A474E1D3D5385B126961 /* SoundLevelIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEEF968F296B8F8B77CC566 /* SoundLevelIndicator.swift */; };
 		B9D45AA47FBD4BA710EA63FD /* AnalogGaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD504D18EBC411035EE256D /* AnalogGaugeView.swift */; };
 		FC0717C8B1678514D21A5ECF /* NoteRingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F564475F19778EBB1FF1539D /* NoteRingPanel.swift */; };
 /* End PBXBuildFile section */
@@ -29,7 +30,7 @@
 		6EF5B295E730003D97E9A67A /* LEDIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LEDIndicatorView.swift; sourceTree = "<group>"; };
 		7D1E77B5577D8CA1BC144117 /* HardwareControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareControlRow.swift; sourceTree = "<group>"; };
 		89CBC2BA7555734694A8507D /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
-		B6DDD81EDABC2A40E3A2262F /* ChromaTuner.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ChromaTuner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B6DDD81EDABC2A40E3A2262F /* ChromaTuner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChromaTuner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B9E873BE1E0EF670095A8B38 /* AppColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppColors.swift; sourceTree = "<group>"; };
 		C7A183453C30C2DDB758F2A3 /* PitchDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PitchDetector.swift; sourceTree = "<group>"; };
 		D87D019464206F9BEB7C8004 /* NoteDialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDialView.swift; sourceTree = "<group>"; };
@@ -37,6 +38,7 @@
 		EDEEF58092887608A624BC77 /* ChromaTunerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromaTunerApp.swift; sourceTree = "<group>"; };
 		EE5A5A28C45DB7748A569120 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F564475F19778EBB1FF1539D /* NoteRingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRingPanel.swift; sourceTree = "<group>"; };
+		FEEEF968F296B8F8B77CC566 /* SoundLevelIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundLevelIndicator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -58,6 +60,7 @@
 				D87D019464206F9BEB7C8004 /* NoteDialView.swift */,
 				F564475F19778EBB1FF1539D /* NoteRingPanel.swift */,
 				EE5A5A28C45DB7748A569120 /* SettingsView.swift */,
+				FEEEF968F296B8F8B77CC566 /* SoundLevelIndicator.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -136,8 +139,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = 85356F8598AAB67B0945DC4B /* Build configuration list for PBXProject "ChromaTuner" */;
 			developmentRegion = en;
@@ -175,6 +176,7 @@
 				FC0717C8B1678514D21A5ECF /* NoteRingPanel.swift in Sources */,
 				75399F8B5BDFB4D89EA2CAA1 /* PitchDetector.swift in Sources */,
 				4BBA2E12BA2FA49AF7B9D816 /* SettingsView.swift in Sources */,
+				8F17A474E1D3D5385B126961 /* SoundLevelIndicator.swift in Sources */,
 				254D5E0CD09B18FED3E0A50C /* TonePlayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -304,6 +306,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = J7MM7A8SK8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "chroma-tuner";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is required to detect pitch when tuning instruments.";
@@ -326,6 +329,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = J7MM7A8SK8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "chroma-tuner";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is required to detect pitch when tuning instruments.";

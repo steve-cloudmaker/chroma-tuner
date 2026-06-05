@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct HardwareControlRow: View {
+    @EnvironmentObject private var audioManager: AudioManager
     @Binding var selectedMode: AppMode
 
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 16) {
             ModeButton(
                 icon: "tuningfork",
                 isActive: selectedMode == .chromatic,
@@ -13,7 +14,11 @@ struct HardwareControlRow: View {
                 selectedMode = .chromatic
             }
 
-            Spacer()
+            SoundLevelIndicator(
+                level: audioManager.inputLevel,
+                isActive: selectedMode == .chromatic && audioManager.isListening
+            )
+            .frame(maxWidth: .infinity)
 
             ModeButton(
                 icon: "speaker.wave.2.fill",
